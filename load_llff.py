@@ -116,10 +116,6 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     
     print('Loaded image data', imgs.shape, poses[:,-1,0])
     return poses, bds, imgs
-
-    
-            
-            
     
 
 def normalize(x):
@@ -265,7 +261,8 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         poses, render_poses, bds = spherify_poses(poses, bds)
 
     else:
-        
+        print(poses.shape)
+        print(poses[0])
         c2w = poses_avg(poses)
         print('recentered', c2w.shape)
         print(c2w[:3,:4])

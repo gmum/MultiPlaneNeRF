@@ -1,11 +1,11 @@
-expname = ship_mi_angles_arch_diff_2
+expname = lego_4
 basedir = ./logs
-datadir = ./data/nerf_synthetic/ship
+datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
 
 no_batching = True
 
-use_viewdirs = True
+use_viewdirs = False
 white_bkgd = True
 lrate_decay = 500
 

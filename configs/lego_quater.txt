@@ -1,19 +1,20 @@
-expname = ship_mi_angles_arch_diff_2
+expname = lego_400_3
 basedir = ./logs
-datadir = ./data/nerf_synthetic/ship
+datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
 
 no_batching = True
 
-use_viewdirs = True
+use_viewdirs = False
 white_bkgd = True
 lrate_decay = 500
 
 N_samples = 64
 N_importance = 128
-N_rand = 4096
+N_rand = 8192
 
-precrop_iters = 750
+precrop_iters = 900
 precrop_frac = 0.5
 
-half_res = False
+divide_fac = 4
+mi_count = 100

@@ -1,4 +1,4 @@
-expname = blender_paper_lego_mi
+expname = super_lego
 basedir = ./logs
 datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
@@ -7,13 +7,10 @@ no_batching = True
 
 use_viewdirs = False
 white_bkgd = True
-lrate_decay = 500
+lrate_decay = 1000
 
-N_samples = 32
+N_samples = 192
 N_importance = 0
-N_rand = 1024
-
-precrop_iters = 750
-precrop_frac = 0.5
+N_rand = 8192
 
 half_res = False

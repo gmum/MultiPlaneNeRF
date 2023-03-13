@@ -1,19 +1,19 @@
-expname = blender_paper_chair
+expname = chair_mi
 basedir = ./logs
 datadir = ./data/nerf_synthetic/chair
 dataset_type = blender
 
 no_batching = True
 
-use_viewdirs = True
+use_viewdirs = False
 white_bkgd = True
 lrate_decay = 500
 
 N_samples = 64
 N_importance = 128
-N_rand = 1024
+N_rand = 2048
 
-precrop_iters = 500
+precrop_iters = 1000
 precrop_frac = 0.5
 
-half_res = True
+half_res = False

@@ -19,8 +19,18 @@ class RenderNetwork(torch.nn.Module):
               torch.nn.ReLU(),
               torch.nn.Linear(256, 256),
               torch.nn.ReLU(),
+    
+        )
+        
+        self.layers_main_2 = torch.nn.Sequential(
+              torch.nn.Linear(256 + self.input_size, 256),
+              torch.nn.ReLU(),
               torch.nn.Linear(256, 256),
-              torch.nn.ReLU(),      
+              torch.nn.ReLU(),
+              torch.nn.Linear(256, 256),
+              torch.nn.ReLU(),
+              torch.nn.Linear(256, 256),
+              torch.nn.ReLU(),     
         )
         
         self.layers_sigma = torch.nn.Sequential(
@@ -39,7 +49,11 @@ class RenderNetwork(torch.nn.Module):
 
     def forward(self, triplane_code, dirs):
         x = self.layers_main(triplane_code)
+        x1 = torch.concat([x, triplane_code], dim=1)
+        
+        x = self.layers_main_2(x1)
         xs = torch.concat([x, triplane_code], dim=1)
+        
         sigma = self.layers_sigma(xs)
         x = torch.concat([x, triplane_code, dirs], dim=1)
         rgb = self.layers_rgb(x)
@@ -122,7 +136,6 @@ class ImagePlanes(torch.nn.Module):
 
 
     def forward(self, points=None):
-        
         if points.shape[0] == 1:
             points = points[0]
 

@@ -7,3 +7,7 @@
 *.dae
 data/*
 logs/*
+logs_2/*
+logs_3/*
+longs_4/*
+*.out

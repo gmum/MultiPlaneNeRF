@@ -171,7 +171,8 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
         gts = np.array(gt_imgs)
         p = -10. * np.log10(np.mean(np.square(rgbss - gts)))
         print(" CALCULATED PSNR FOR TESTSET")
-        print(p)
+        with open(os.path.join(savedir, 'metric.txt'), 'a') as f:
+            f.write(f"{p}\n")
         
     disps = np.stack(disps, 0)
 
@@ -316,6 +317,8 @@ def create_mi_nerf(plane, args):
 
         # Load model
         model.load_state_dict(ckpt['network_fn_state_dict'])
+        if model_fine is not None:
+            model_fine.load_state_dict(ckpt['network_fine_state_dict'])
 
     ##########################
 
@@ -593,7 +596,7 @@ def config_parser():
                         help='downsample factor for LLFF images')
     parser.add_argument("--no_ndc", action='store_true', 
                         help='do not use normalized device coordinates (set for non-forward facing scenes)')
-    parser.add_argument("--lindisp", action='store_false', 
+    parser.add_argument("--lindisp", action='store_true', 
                         help='sampling linearly in disparity rather than depth')
     parser.add_argument("--spherify", action='store_true', 
                         help='set for spherical 360 scenes')
@@ -729,7 +732,11 @@ def train():
 
     # Create nerf model
     print("images: ", args.mi_count)
-    render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_mi_nerf(ImagePlanes(focal, poses, images, args.mi_count), args) #create_nerf(args)
+    if args.dataset_type != 'llff':
+        render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_mi_nerf(ImagePlanes(focal, poses, images, args.mi_count), args) #create_nerf(args)
+    else:
+        render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_mi_nerf(LLFFImagePlanes(hwf, poses, images, args.mi_count), args)
+        
     global_step = start
 
     bds_dict = {
@@ -790,7 +797,7 @@ def train():
         rays_rgb = torch.Tensor(rays_rgb).to(device)
 
 
-    N_iters = 200000 + 1
+    N_iters = 1000000 + 1
     print('Begin')
     print('TRAIN views are', i_train)
     print('TEST views are', i_test)
@@ -910,7 +917,7 @@ def train():
             #     render_kwargs_test['c2w_staticcam'] = None
             #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
-        if (i%args.i_testset==0 and i > 0) or i in [1000, 2500]:
+        if (i%args.i_testset==0) or i in [1000, 2500]:
             testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)

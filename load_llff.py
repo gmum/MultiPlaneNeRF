@@ -70,7 +70,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     sh = imageio.imread(img0).shape
     
     sfx = ''
-    
+    factor = None
     if factor is not None:
         sfx = '_{}'.format(factor)
         _minify(basedir, factors=[factor])

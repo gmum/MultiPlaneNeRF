@@ -1,0 +1,20 @@
+expname = generalized
+basedir = ./logs_4
+datadir = ./data/multiple/cars
+dataset_type = many
+
+no_batching = True
+
+use_viewdirs = False
+white_bkgd = True
+lrate_decay = 500
+
+N_samples = 32
+N_importance = 16
+N_rand = 512
+
+precrop_iters = 50
+precrop_frac = 0.5
+
+half_res = False
+render_only = False

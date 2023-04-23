@@ -1,5 +1,5 @@
-expname = lego_c60_2
-basedir = ./logs
+expname = lego_c60
+basedir = ./logs_4
 datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
 
@@ -11,9 +11,9 @@ lrate_decay = 500
 
 N_samples = 64
 N_importance = 128
-N_rand = 4096
+N_rand = 1024
 
-precrop_iters = 2000
+precrop_iters = 750
 precrop_frac = 0.5
 
 divide_fac = 1

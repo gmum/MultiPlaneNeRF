@@ -1,11 +1,11 @@
-expname = fern_test_5
-basedir = ./logs
+expname = fern_test_ndc_f1
+basedir = ./logs_4
 datadir = ./data/nerf_llff_data/fern
 dataset_type = llff
 
 no_batching = True
 
-factor = 8
+factor = 1
 llffhold = 8
 
 N_rand = 1024
@@ -13,6 +13,9 @@ N_samples = 64
 N_importance = 128
 
 use_viewdirs = True
+raw_noise_std = 1e0
 
 mi_count = 20
+
+no_ndc = False
 

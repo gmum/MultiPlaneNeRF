@@ -1,17 +1,17 @@
-expname = drums_mi
-basedir = ./logs
+expname = drums_mi_2
+basedir = ./logs_4
 datadir = ./data/nerf_synthetic/drums
 dataset_type = blender
 
 no_batching = True
 
-use_viewdirs = False
+use_viewdirs = True
 white_bkgd = True
 lrate_decay = 500
 
 N_samples = 64
 N_importance = 128
-N_rand = 4096
+N_rand = 1024
 
 precrop_iters = 750
 precrop_frac = 0.5

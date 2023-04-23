@@ -16,6 +16,8 @@ from run_nerf_helpers import *
 from load_generalized import load_many_data, get_train_ids, get_test_ids
 
 from multiplane_helpers_generalized import MultiImageNeRF
+from dataset import NeRFShapeNetDataset
+from torch.utils.data import DataLoader
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -537,7 +539,14 @@ def train():
     K = None
 
     if args.dataset_type == 'many':
-        objects, test_objects, render_poses, hwf = load_many_data('/home/spurek/hyperrf_data/ds/mixed/sampled')
+        
+        dataset = NeRFShapeNetDataset(root_dir='/home/z1153041/dataset_maker/ds', classes=['cars'])
+        dataloader = DataLoader(dataset, batch_size=8, shuffle=True, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
+        
+        dataset_test = NeRFShapeNetDataset(root_dir='/home/z1153041/dataset_maker/ds', classes=['cars'], train=False)
+        dataloader_test = DataLoader(dataset, batch_size=1, shuffle=False, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
+        
+        objects, test_objects, render_poses, hwf = load_many_data('/home/z1153041/mixed')
         print('Loaded many')
         near = 2.
         far = 6.
@@ -620,48 +629,48 @@ def train():
     # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
 
     
-    if args.render_only:
-        print("rendering only test object test images")
-        psnrs = []
-        for oi, object in enumerate(test_objects.values()):
-            testsavedir = os.path.join(basedir, expname, f'testset_ro', f'{oi}')
-            os.makedirs(testsavedir, exist_ok=True)
-            poses = object['poses_test']
-            render_kwargs_test['network_fn'].image_plane = object['image_plane']
-            render_kwargs_test['network_fine'].image_plane = object['image_plane']
-            with torch.no_grad():
-                e = embedder(object['images'][0])
-                render_kwargs_test['network_fn'].set_embedding(e)
-                render_kwargs_test['network_fine'].set_embedding(e)
-                _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
-                psnrs.append(p)
+    # if args.render_only:
+    #     print("rendering only test object test images")
+    #     psnrs = []
+    #     for oi, object in enumerate(test_objects.values()):
+    #         testsavedir = os.path.join(basedir, expname, f'testset_ro', f'{oi}')
+    #         os.makedirs(testsavedir, exist_ok=True)
+    #         poses = object['poses_test']
+    #         render_kwargs_test['network_fn'].image_plane = object['image_plane']
+    #         render_kwargs_test['network_fine'].image_plane = object['image_plane']
+    #         with torch.no_grad():
+    #             e = embedder(object['images'][0])
+    #             render_kwargs_test['network_fn'].set_embedding(e)
+    #             render_kwargs_test['network_fine'].set_embedding(e)
+    #             _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
+    #             psnrs.append(p)
                 
-        psnrs = np.array(psnrs)
-        print("mean1", np.mean(psnrs))
+    #     psnrs = np.array(psnrs)
+    #     print("mean1", np.mean(psnrs))
                 
-        print("rendering only train object test images")
-        psnrs = []
-        for oi, object in enumerate(objects.values()):
-            testsavedir = os.path.join(basedir, expname, f'trainset_ro', f'{oi}')
-            os.makedirs(testsavedir, exist_ok=True)
-            poses = object['poses_test']
-            render_kwargs_test['network_fn'].image_plane = object['image_plane']
-            render_kwargs_test['network_fine'].image_plane = object['image_plane']
-            with torch.no_grad():
-                e = embedder(object['images'][0])
-                render_kwargs_test['network_fn'].set_embedding(e)
-                render_kwargs_test['network_fine'].set_embedding(e)
-                _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
-                psnrs.append(p)
+    #     print("rendering only train object test images")
+    #     psnrs = []
+    #     for oi, object in enumerate(objects.values()):
+    #         testsavedir = os.path.join(basedir, expname, f'trainset_ro', f'{oi}')
+    #         os.makedirs(testsavedir, exist_ok=True)
+    #         poses = object['poses_test']
+    #         render_kwargs_test['network_fn'].image_plane = object['image_plane']
+    #         render_kwargs_test['network_fine'].image_plane = object['image_plane']
+    #         with torch.no_grad():
+    #             e = embedder(object['images'][0])
+    #             render_kwargs_test['network_fn'].set_embedding(e)
+    #             render_kwargs_test['network_fine'].set_embedding(e)
+    #             _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
+    #             psnrs.append(p)
                 
-        psnrs = np.array(psnrs)
-        print("mean2", np.mean(psnrs))
+    #     psnrs = np.array(psnrs)
+    #     print("mean2", np.mean(psnrs))
         
-        print('Saved test set')
+    #     print('Saved test set')
     
         
-    objects_per_batch = 4
-    batch_count = 50
+    #objects_per_batch = 4
+    #batch_count = 50
     
     start = start + 1
     losses = []
@@ -669,20 +678,22 @@ def train():
         total_loss = 0
         objcs_for_training = list(objects.values())
         random.shuffle(objcs_for_training)
-        for j in range(batch_count):
+        for i, batch in enumerate(dataloader):
             targets = []
             results = []
-            for oi, object in enumerate(objcs_for_training[j*objects_per_batch : (j+1)*objects_per_batch]):
+            for oi in range(batch['images'].size(0)):
+                object = {'images': batch['images'][oi].astype(np.float32), 'cam_poses': batch['cam_poses'][oi].astype(np.float32)}
                 time0 = time.time()
 
                 # Random from one image
                 img_i = np.random.choice(list(range(45)))
                 target = object['images'][img_i]
                 target = torch.Tensor(target).to(device)
-                pose = object['poses'][img_i, :3,:4]
-                
-                render_kwargs_train['network_fn'].image_plane = object['image_plane']
-                render_kwargs_train['network_fine'].image_plane = object['image_plane']
+                pose = object['cam_poses'][img_i, :3,:4]
+                image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].astype(np.float32), object['images'][list(get_train_ids())].astype(np.float32), 50)
+
+                render_kwargs_train['network_fn'].image_plane = image_plane
+                render_kwargs_train['network_fine'].image_plane = image_plane
 
                 if N_rand is not None:
                     rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
@@ -774,7 +785,23 @@ def train():
             #     render_kwargs_test['c2w_staticcam'] = None
             #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
-        if (i%args.i_testset==0 and i > 0) or i in [500, 5000]:
+        if (i%25==0):
+            for ti, batch in enumerate(dataloader):
+                for oi in range(batch['images'].size(0)):
+                    object = {'images': batch['images'][oi], 'cam_poses': batch['cam_poses'][oi]}
+                    testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{ti}')
+                    os.makedirs(testsavedir, exist_ok=True)
+                    poses = object['cam_poses']
+                    with torch.no_grad():
+                        image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].astype(np.float32), object['images'][list(get_train_ids())].astype(np.float32), 50)
+                        render_kwargs_test['network_fn'].image_plane = image_plane
+                        render_kwargs_test['network_fine'].image_plane = image_plane
+                        _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
+                        psnrs.append(p)
+                break
+                
+        if (i%args.i_testset==0 and i > 0) or i in [1000, 5000]:
+            print("XD")
             # psnrs = []
             # for oi, object in enumerate(objects.values()):
             #     testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{oi}')
@@ -790,39 +817,39 @@ def train():
             #         psnrs.append(p)
             # print("rendering only test object test images")
             
-            psnrs = []
-            for oi, object in enumerate(test_objects.values()):
-                testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{oi}')
-                os.makedirs(testsavedir, exist_ok=True)
-                poses = object['poses_test']
-                render_kwargs_test['network_fn'].image_plane = object['image_plane']
-                render_kwargs_test['network_fine'].image_plane = object['image_plane']
-                with torch.no_grad():
-                    _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
-                    imageio.imwrite(os.path.join(testsavedir, f'gt{oi}.png'), to8b(object['images_test'][oi]))
-                    psnrs.append(p)
+            # psnrs = []
+            # for oi, object in enumerate(test_objects.values()):
+            #     testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{oi}')
+            #     os.makedirs(testsavedir, exist_ok=True)
+            #     poses = object['poses_test']
+            #     render_kwargs_test['network_fn'].image_plane = object['image_plane']
+            #     render_kwargs_test['network_fine'].image_plane = object['image_plane']
+            #     with torch.no_grad():
+            #         _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
+            #         imageio.imwrite(os.path.join(testsavedir, f'gt.png'), to8b(object['images_test'][0]))
+            #         psnrs.append(p)
                     
-            psnrs = np.array(psnrs)
-            print("mean1", np.mean(psnrs))
+            # psnrs = np.array(psnrs)
+            # print("mean1", np.mean(psnrs))
                     
-            print("rendering only train object test images")
-            psnrs = []
-            for oi, object in enumerate(objects.values()):
-                testsavedir = os.path.join(basedir, expname, f'trainset_{i}', f'{oi}')
-                os.makedirs(testsavedir, exist_ok=True)
-                poses = object['poses_test']
-                render_kwargs_test['network_fn'].image_plane = object['image_plane']
-                render_kwargs_test['network_fine'].image_plane = object['image_plane']
-                with torch.no_grad():
-                    _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
-                    imageio.imwrite(os.path.join(testsavedir, f'gt{oi}.png'), to8b(object['images'][oi]))
-                    psnrs.append(p)
-                break
+            # print("rendering only train object test images")
+            # psnrs = []
+            # for oi, object in enumerate(objects.values()):
+            #     testsavedir = os.path.join(basedir, expname, f'trainset_{i}', f'{oi}')
+            #     os.makedirs(testsavedir, exist_ok=True)
+            #     poses = object['poses_test']
+            #     render_kwargs_test['network_fn'].image_plane = object['image_plane']
+            #     render_kwargs_test['network_fine'].image_plane = object['image_plane']
+            #     with torch.no_grad():
+            #         _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
+            #         imageio.imwrite(os.path.join(testsavedir, f'gt.png'), to8b(object['images'][0]))
+            #         psnrs.append(p)
+            #     break
                     
-            psnrs = np.array(psnrs)
-            print("mean2", np.mean(psnrs))
+            # psnrs = np.array(psnrs)
+            # print("mean2", np.mean(psnrs))
             
-            print('Saved test set')
+            # print('Saved test set')
                 
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")

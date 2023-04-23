@@ -9,13 +9,13 @@ class RenderNetwork(torch.nn.Module):
         super().__init__()
         self.input_size = 3*input_size + input_size*3 
         self.layers_main = torch.nn.Sequential(
-              torch.nn.Linear(self.input_size, 256),
+              torch.nn.Linear(self.input_size, 2048),
               torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
+              torch.nn.Linear(2048, 1024),
               torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
+              torch.nn.Linear(1024, 512),
               torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
+              torch.nn.Linear(512, 256),
               torch.nn.ReLU(),
               torch.nn.Linear(256, 256),
               torch.nn.ReLU(),

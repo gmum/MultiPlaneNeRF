@@ -36,7 +36,6 @@ def pose_spherical(theta, phi, radius):
     c2w = torch.Tensor(np.array([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])) @ c2w
     return c2w
 
-#dont ask why
 def get_train_ids():
     for i in range(0, 45):
         yield i

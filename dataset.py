@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 from os.path import join
 
 from multiplane_helpers_generalized import ImagePlane
@@ -44,7 +43,7 @@ def get_test_ids():
 
 class NeRFShapeNetDataset(Dataset):
     def __init__(self, root_dir='/home/datasets/nerfdataset', shapenet_root_dir='/shared/sets/datasets/3D_points/ShapeNetCore.v2', classes=[],
-                 transform=None, train=True):
+                 train=True):
         """
         Args:
             root_dir (string): Directory of structure: 
@@ -64,7 +63,6 @@ class NeRFShapeNetDataset(Dataset):
         """
         self.root_dir = root_dir
         self.shapenet_root_dir = shapenet_root_dir
-        self.transform = transform
 
         self.classes = classes
         self.train = train
@@ -90,8 +88,7 @@ class NeRFShapeNetDataset(Dataset):
 
         sample = np.load(data_files['sample_filename'][idx])
         class_name = data_files['class'][idx]
-        if self.transform:
-            sample = self.transform(sample)   
+ 
         
         #image_plane = ImagePlane(self.focal, sample['cam_poses'][list(get_train_ids())].astype(np.float32), sample['images'][list(get_train_ids())].astype(np.float32), 50)
         #return self.data[idx]

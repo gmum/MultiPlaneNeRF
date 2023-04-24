@@ -15,7 +15,7 @@ from run_nerf_helpers import *
 
 from load_generalized import load_many_data, get_train_ids, get_test_ids
 
-from multiplane_helpers_generalized import MultiImageNeRF
+from multiplane_helpers_generalized import MultiImageNeRF, ImagePlane
 from dataset import NeRFShapeNetDataset
 from torch.utils.data import DataLoader
 
@@ -171,7 +171,7 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
     rgbs = np.stack(rgbs, 0)
     
     if gt_imgs is not None:
-        p = -10. * np.log10(np.mean(np.square(rgbs - gt_imgs)))
+        p = -10. * np.log10(np.mean(np.square(rgbs - gt_imgs.cpu().numpy())))
         print(" CALCULATED PSNR FOR TESTSET")
         print(p)
         
@@ -540,10 +540,10 @@ def train():
 
     if args.dataset_type == 'many':
         
-        dataset = NeRFShapeNetDataset(root_dir='/home/z1153041/dataset_maker/ds', classes=['cars'])
+        dataset = NeRFShapeNetDataset(root_dir='/home/spurek/hyperrf_data/ds', classes=['cars'])
         dataloader = DataLoader(dataset, batch_size=8, shuffle=True, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
         
-        dataset_test = NeRFShapeNetDataset(root_dir='/home/z1153041/dataset_maker/ds', classes=['cars'], train=False)
+        dataset_test = NeRFShapeNetDataset(root_dir='/home/spurek/hyperrf_data/ds', classes=['cars'], train=False)
         dataloader_test = DataLoader(dataset, batch_size=1, shuffle=False, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
         
         objects, test_objects, render_poses, hwf = load_many_data('/home/z1153041/mixed')
@@ -678,11 +678,11 @@ def train():
         total_loss = 0
         objcs_for_training = list(objects.values())
         random.shuffle(objcs_for_training)
-        for i, batch in enumerate(dataloader):
+        for bi, batch in enumerate(dataloader):
             targets = []
             results = []
             for oi in range(batch['images'].size(0)):
-                object = {'images': batch['images'][oi].astype(np.float32), 'cam_poses': batch['cam_poses'][oi].astype(np.float32)}
+                object = {'images': batch['images'][oi].float(), 'cam_poses': batch['cam_poses'][oi].float()}
                 time0 = time.time()
 
                 # Random from one image
@@ -690,7 +690,7 @@ def train():
                 target = object['images'][img_i]
                 target = torch.Tensor(target).to(device)
                 pose = object['cam_poses'][img_i, :3,:4]
-                image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].astype(np.float32), object['images'][list(get_train_ids())].astype(np.float32), 50)
+                image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].cpu().numpy(), object['images'][list(get_train_ids())].cpu().numpy(), 50)
 
                 render_kwargs_train['network_fn'].image_plane = image_plane
                 render_kwargs_train['network_fine'].image_plane = image_plane
@@ -785,19 +785,19 @@ def train():
             #     render_kwargs_test['c2w_staticcam'] = None
             #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
-        if (i%25==0):
-            for ti, batch in enumerate(dataloader):
+        if i%5==0:
+            for ti, batch in enumerate(dataloader_test):
                 for oi in range(batch['images'].size(0)):
-                    object = {'images': batch['images'][oi], 'cam_poses': batch['cam_poses'][oi]}
+                    object = {'images': batch['images'][oi].float(), 'cam_poses': batch['cam_poses'][oi].float()}
                     testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{ti}')
                     os.makedirs(testsavedir, exist_ok=True)
-                    poses = object['cam_poses']
+                    poses = object['cam_poses'][0:5]
                     with torch.no_grad():
-                        image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].astype(np.float32), object['images'][list(get_train_ids())].astype(np.float32), 50)
+                        image_plane = ImagePlane(focal, object['cam_poses'][list(get_train_ids())].cpu().numpy(), object['images'][list(get_train_ids())].cpu().numpy(), 50)
                         render_kwargs_test['network_fn'].image_plane = image_plane
                         render_kwargs_test['network_fine'].image_plane = image_plane
-                        _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images_test'], savedir=testsavedir)
-                        psnrs.append(p)
+                        _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images'][0:5], savedir=testsavedir)
+                        imageio.imwrite(os.path.join(testsavedir, f'gt.png'), to8b(object['images'][0].cpu().numpy()))
                 break
                 
         if (i%args.i_testset==0 and i > 0) or i in [1000, 5000]:
@@ -851,53 +851,10 @@ def train():
             
             # print('Saved test set')
                 
-        if i%args.i_print==0:
-            tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
-            plt.plot(losses)
-            plt.savefig(os.path.join(basedir, expname, f'loss_plot.png'))
-            plt.close()
-        """
-            print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
-            print('iter time {:.05f}'.format(dt))
-
-            with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_print):
-                tf.contrib.summary.scalar('loss', loss)
-                tf.contrib.summary.scalar('psnr', psnr)
-                tf.contrib.summary.histogram('tran', trans)
-                if args.N_importance > 0:
-                    tf.contrib.summary.scalar('psnr0', psnr0)
-
-
-            if i%args.i_img==0:
-
-                # Log a rendered validation view to Tensorboard
-                img_i=np.random.choice(i_val)
-                target = images[img_i]
-                pose = poses[img_i, :3,:4]
-                with torch.no_grad():
-                    rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose,
-                                                        **render_kwargs_test)
-
-                psnr = mse2psnr(img2mse(rgb, target))
-
-                with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-
-                    tf.contrib.summary.image('rgb', to8b(rgb)[tf.newaxis])
-                    tf.contrib.summary.image('disp', disp[tf.newaxis,...,tf.newaxis])
-                    tf.contrib.summary.image('acc', acc[tf.newaxis,...,tf.newaxis])
-
-                    tf.contrib.summary.scalar('psnr_holdout', psnr)
-                    tf.contrib.summary.image('rgb_holdout', target[tf.newaxis])
-
-
-                if args.N_importance > 0:
-
-                    with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_img):
-                        tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
-                        tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis,...,tf.newaxis])
-                        tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis,...,tf.newaxis])
-        """
-
+        tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+        plt.plot(losses)
+        plt.savefig(os.path.join(basedir, expname, f'loss_plot.png'))
+        plt.close()
         global_step += 1
 
 

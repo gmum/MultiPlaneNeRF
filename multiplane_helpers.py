@@ -110,7 +110,6 @@ class ImagePlanes(torch.nn.Module):
         self.images = []
 
         self.focal = focal
-        print(count, "ip")
         for i in range(min(count, poses.shape[0])):
             M = poses[i]
             M = torch.from_numpy(M)                
@@ -131,8 +130,6 @@ class ImagePlanes(torch.nn.Module):
         self.K_matrices = torch.stack(self.K_matrices).to(device)
         self.image_plane = torch.stack(self.images).to(device)
         
-        print(count, "ip2")
-        print(self.image_plane.shape)
 
 
     def forward(self, points=None):
@@ -194,9 +191,6 @@ class LLFFImagePlanes(torch.nn.Module):
         self.pose_matrices = torch.stack(self.pose_matrices).to(device)
         self.K_matrices = torch.stack(self.K_matrices).to(device)
         self.image_plane = torch.stack(self.images).to(device)
-        
-        print(count, "ip2")
-        print(self.image_plane.shape)
 
 
     def forward(self, points=None):

@@ -1,4 +1,4 @@
-expname = generalized_full_dataset
+expname = generalized_cars_small
 basedir = ./logs_4
 datadir = ./data/multiple/cars
 dataset_type = many
@@ -9,12 +9,14 @@ use_viewdirs = False
 white_bkgd = True
 lrate_decay = 500
 
-N_samples = 64
-N_importance = 128
+N_samples = 32
+N_importance = 16
 N_rand = 512
 
-precrop_iters = 50
+precrop_iters = 10
 precrop_frac = 0.5
 
 half_res = False
 render_only = False
+
+i_weights = 100

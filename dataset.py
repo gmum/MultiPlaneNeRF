@@ -89,11 +89,10 @@ class NeRFShapeNetDataset(Dataset):
         sample = np.load(data_files['sample_filename'][idx])
         class_name = data_files['class'][idx]
  
-        
         #image_plane = ImagePlane(self.focal, sample['cam_poses'][list(get_train_ids())].astype(np.float32), sample['images'][list(get_train_ids())].astype(np.float32), 50)
         #return self.data[idx]
         
-        item = {'images': sample['images'], 'cam_poses': sample['cam_poses']}
+        item = {'images': np.array(sample['images']).astype(np.float32), 'cam_poses': np.array(sample['cam_poses']).astype(np.float32)}
         return item
 
     def _load(self):
@@ -121,7 +120,7 @@ class NeRFShapeNetDataset(Dataset):
 
             #Sort and split, same like Atlasnet
             df = df.sort_values(by=['name'])
-            df_train = df.head(max(1,int(len(df)*(0.8))))
+            df_train = df.head(max(1,int(len(df)*(0.01)))) #0.8
             df_test = df.tail(max(1,int(len(df)*(0.2))))
         
             self.train_data = pd.concat([self.train_data, df_train])

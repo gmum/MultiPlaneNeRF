@@ -65,7 +65,7 @@ def load_many_data(basedir):
         object['poses_test'] = p[list(get_test_ids())]
         object['image_plane'] = image_plane
         
-        if fi == 500:
+        if fi == 20:
             break
             
         if fi >= 10:

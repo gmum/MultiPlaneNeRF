@@ -11,31 +11,23 @@ class RenderNetwork(torch.nn.Module):
         self.layers_main = torch.nn.Sequential(
               torch.nn.Linear(self.input_size, 2048),
               torch.nn.ReLU(),
-              torch.nn.Linear(2048, 1024),
+              torch.nn.Linear(2048, 512),
               torch.nn.ReLU(),
-              torch.nn.Linear(1024, 512),
-              torch.nn.ReLU(),
-              torch.nn.Linear(512, 256),
-              torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
+              torch.nn.Linear(512, 512),
               torch.nn.ReLU(),
         )
         
         self.layers_main_2 = torch.nn.Sequential(
-              torch.nn.Linear(256 + self.input_size, 256),
+              torch.nn.Linear(512 + self.input_size, 256),
               torch.nn.ReLU(),
               torch.nn.Linear(256, 256),
-              torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
-              torch.nn.ReLU(),
-              torch.nn.Linear(256, 256),
-              torch.nn.ReLU(),     
+              torch.nn.ReLU(),    
         )
         
         self.layers_sigma = torch.nn.Sequential(
-            torch.nn.Linear(256 + self.input_size, 128), #dodane wejscie tutaj moze cos pomoze
+            torch.nn.Linear(256 + self.input_size, 256), 
             torch.nn.ReLU(),
-            torch.nn.Linear(128, 1)
+            torch.nn.Linear(256, 1)
         )
         
         self.layers_rgb = torch.nn.Sequential(
@@ -47,7 +39,9 @@ class RenderNetwork(torch.nn.Module):
         )
 
     def forward(self, triplane_code, viewdir):
-        triplane_code = torch.cat([triplane_code, viewdir[0]], dim=-1)
+        #print(triplane_code.size)
+        #print(viewdir.size)
+        #x0 = torch.cat([triplane_code, viewdir], dim=-1)
         x = self.layers_main(triplane_code)
         x1 = torch.concat([x, triplane_code], dim=1)
         
@@ -55,7 +49,7 @@ class RenderNetwork(torch.nn.Module):
         xs = torch.concat([x, triplane_code], dim=1)
         
         sigma = self.layers_sigma(xs)
-        x = torch.concat([x, triplane_code], dim=1)
+        x = torch.concat([x, triplane_code, viewdir], dim=1)
         rgb = self.layers_rgb(x)
         return torch.concat([rgb, sigma], dim=1)
 

@@ -1,5 +1,5 @@
 expname = lego_c40
-basedir = ./logs_4
+basedir = ./logs_mini
 datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
 

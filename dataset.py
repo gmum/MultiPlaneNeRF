@@ -120,7 +120,7 @@ class NeRFShapeNetDataset(Dataset):
 
             #Sort and split, same like Atlasnet
             df = df.sort_values(by=['name'])
-            df_train = df.head(max(1,int(len(df)*(0.01)))) #0.8
+            df_train = df.head(max(1,int(len(df)*(0.8)))) #0.8
             df_test = df.tail(max(1,int(len(df)*(0.2))))
         
             self.train_data = pd.concat([self.train_data, df_train])

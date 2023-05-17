@@ -1,8 +1,8 @@
-expname = generalized_chairs_all
+expname = generalized_cars_all_big
 basedir = ./logs_4
-datadir = ./data/multiple/chairs
+datadir = ./data/multiple/cars
 dataset_type = many
-
+dataset_sample = cars
 no_batching = True
 
 use_viewdirs = True
@@ -19,4 +19,4 @@ precrop_frac = 0.5
 half_res = False
 render_only = False
 
-i_weights = 10
+i_weights = 20

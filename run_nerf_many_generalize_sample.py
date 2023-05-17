@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm, trange
-
+from os.path import join
 import matplotlib.pyplot as plt
 
 from run_nerf_helpers import *
@@ -19,19 +19,46 @@ from multiplane_helpers_generalized import MultiImageNeRF, ImagePlane
 from dataset import NeRFShapeNetDataset
 from torch.utils.data import DataLoader
 
+import pandas as pd
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
+def calculate_image_metrics(entry, render_kwargs, metric_fn, count, args):
+    x = []
+    y = []
+    with torch.no_grad():
+        for c in range(count):
+            img_i = np.random.choice(len(entry['images']), 1)
+            target = entry['images'][img_i][0].to(device)
+            target = torch.Tensor(target.float())
+            pose = entry['cam_poses'][img_i, :3,:4][0].to(device)
+            
+            H = entry["images"].shape[1]
+            W = entry["images"].shape[2]
+            focal = .5 * W / np.tan(.5 * 0.6911112070083618) 
 
-def set_seed(seed: int = 0):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    
+            K = np.array([
+            [focal, 0, 0.5*W],
+            [0, focal, 0.5*H],
+            [0, 0, 1]
+            ])
 
+            img, _, _, _ = render(H, W, K, chunk=args.netchunk, c2w=pose,
+                                                        verbose=True, retraw=True,
+                                                        **render_kwargs)
+            
+            x.append(img)
+            y.append(target)
+        
+        x = torch.stack(x)
+        y = torch.stack(y)
+
+        metric_val = metric_fn(y, x)
+
+        return metric_val
 
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
@@ -171,7 +198,7 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
         """
 
         if savedir is not None:
-            rgb8 = to8b(rgbs[-1])
+            rgb8 = rgb.cpu().numpy() #to8b(rgbs[-1])
             filename = os.path.join(savedir, '{:03d}.png'.format(i))
             imageio.imwrite(filename, rgb8)
 
@@ -214,7 +241,7 @@ def create_mi_nerf(count, args):
         grad_vars += list(model_fine.parameters())
 
     # Create optimizer
-    optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
+    #optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
 
     start = 0
     basedir = args.basedir
@@ -235,10 +262,12 @@ def create_mi_nerf(count, args):
         ckpt = torch.load(ckpt_path)
 
         start = ckpt['global_step']
-        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        #optimizer.load_state_dict(ckpt['optimizer_state_dict'])
 
         # Load model
         model.load_state_dict(ckpt['network_fn_state_dict'])
+        model_fine.load_state_dict(ckpt['network_fine_state_dict'])
+
 
     ##########################
 
@@ -264,7 +293,7 @@ def create_mi_nerf(count, args):
     render_kwargs_test['perturb'] = False
     render_kwargs_test['raw_noise_std'] = 0.
 
-    return render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer
+    return render_kwargs_train, render_kwargs_test, start, grad_vars#, optimizer
 
 def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=False):
     """Transforms model's predictions to semantically meaningful values.
@@ -500,10 +529,9 @@ def config_parser():
                         help='options: llff / blender / deepvoxels')
     parser.add_argument("--testskip", type=int, default=8, 
                         help='will load 1/N images from test/val sets, useful for large datasets like deepvoxels')
-
+    
     parser.add_argument("--dataset_sample", type=str, default='cars', 
                         help='')
-
 
     ## deepvoxels flags
     parser.add_argument("--shape", type=str, default='greek', 
@@ -552,13 +580,13 @@ def train():
 
     if args.dataset_type == 'many':
         
-        dataset = NeRFShapeNetDataset(root_dir=args.datadir, classes=[args.dataset_sample])
+        dataset = NeRFShapeNetDataset(root_dir='/home/spurek/hyperrf_data/ds', classes=[args.dataset_sample])
         dataloader = DataLoader(dataset, batch_size=4, shuffle=True, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
         
-        dataset_test = NeRFShapeNetDataset(root_dir=args.datadir, classes=[args.dataset_sample], train=False)
-        dataloader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
+        dataset_test = NeRFShapeNetDataset(root_dir='/home/spurek/hyperrf_data/ds', classes=[args.dataset_sample], train=False)
+        dataloader_test = DataLoader(dataset_test, batch_size=1, shuffle=False, drop_last=True, pin_memory=False, generator=torch.Generator(device='cuda'))
         
-        objects, test_objects, render_poses, hwf = load_many_data(f'{args.datadir}/{args.dataset_sample}')
+        objects, test_objects, render_poses, hwf = load_many_data(f'/home/spurek/hyperrf_data/ds/{args.dataset_sample}')
         print('Loaded many')
         near = 2.
         far = 6.
@@ -594,9 +622,9 @@ def train():
             file.write(open(args.config, 'r').read())
 
     # Create nerf model
-    render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_mi_nerf(50, args)
+    render_kwargs_train, render_kwargs_test, start, grad_vars = create_mi_nerf(50, args)
     global_step = start
-
+ 
     bds_dict = {
         'near' : near,
         'far' : far,
@@ -607,160 +635,43 @@ def train():
     # Move testing data to GPU
     render_poses = torch.Tensor(render_poses).to(device)
 
-    # Prepare raybatch tensor if batching random rays
-    N_rand = args.N_rand
-    use_batching = not args.no_batching
-    if use_batching:
-        # For random ray batching
-        print('get rays')
-        rays = np.stack([get_rays_np(H, W, K, p) for p in poses[:,:3,:4]], 0) # [N, ro+rd, H, W, 3]
-        print('done, concats')
-        rays_rgb = np.concatenate([rays, images[:,None]], 1) # [N, ro+rd+rgb, H, W, 3]
-        rays_rgb = np.transpose(rays_rgb, [0,2,3,1,4]) # [N, H, W, ro+rd+rgb, 3]
-        rays_rgb = np.stack([rays_rgb[i] for i in i_train], 0) # train images only
-        rays_rgb = np.reshape(rays_rgb, [-1,3,3]) # [(N-1)*H*W, ro+rd+rgb, 3]
-        rays_rgb = rays_rgb.astype(np.float32)
-        print('shuffle rays')
-        np.random.shuffle(rays_rgb)
+    objcs_for_training = list(objects.values())
+    random.shuffle(objcs_for_training)
+    for bi, batch in enumerate(dataloader_test):
+        
+        # Limit number of rendered objects
+        #if bi >= 300:
+        #    break
+        
+        results_dir = join(basedir, expname, 'examples_200', str(bi))
+        os.makedirs(results_dir, exist_ok=True)
+        for oi in range(batch['images'].size(0)):
+            object = {'images': batch['images'][oi].float(), 'cam_poses': batch['cam_poses'][oi].float()}
 
-        print('done')
-        i_batch = 0
+            image_plane = ImagePlane(focal, object['cam_poses'].cpu().numpy(), object['images'].cpu().numpy(), 50)
 
-    # Move training data to GPU
-    if use_batching:
-        images = torch.Tensor(images).to(device)
-   # poses = torch.Tensor(poses).to(device)
-    if use_batching:
-        rays_rgb = torch.Tensor(rays_rgb).to(device)
-
-
-    N_iters = 20000 + 1
-    print('Begin')
-    
-    # Summary writers
-    # writer = SummaryWriter(os.path.join(basedir, 'summaries', expname))
-    
-    start = start + 1
-    losses = []
-    psnrs = []
-    for i in trange(start, N_iters):
-        time0 = time.time()
-        total_loss = 0
-        objcs_for_training = list(objects.values())
-        random.shuffle(objcs_for_training)
-        for bi, batch in enumerate(dataloader):
-            targets = []
-            results = []
-            for oi in range(batch['images'].size(0)):
-                object = {'images': batch['images'][oi].float(), 'cam_poses': batch['cam_poses'][oi].float()}
-
-                # Random from one image
-                img_i = np.random.choice(list(range(45)))
-                target = object['images'][img_i]
-                target = torch.Tensor(target).to(device)
-                pose = object['cam_poses'][img_i, :3,:4]
-                image_plane = ImagePlane(focal, object['cam_poses'].cpu().numpy(), object['images'].cpu().numpy(), 50)
-
-                render_kwargs_train['network_fn'].image_plane = image_plane
-                render_kwargs_train['network_fine'].image_plane = image_plane
-
-                if N_rand is not None:
-                    rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
-
-                    if i < args.precrop_iters:
-                        dH = int(H//2 * args.precrop_frac)
-                        dW = int(W//2 * args.precrop_frac)
-                        coords = torch.stack(
-                            torch.meshgrid(
-                                torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
-                                torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
-                            ), -1)                
-                    else:
-                        coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
-
-                coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
-                select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
-                select_coords = coords[select_inds].long()  # (N_rand, 2)
-                rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays = torch.stack([rays_o, rays_d], 0)
-                target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-
-                #####  Core optimization loop  #####
-                rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
-                                                            verbose=False, retraw=True,
-                                                            **render_kwargs_train)
-                    
-                targets.append(target_s)
-                results.append(rgb)
-
-            optimizer.zero_grad()
-            target_s = torch.stack(targets)
-            rgb = torch.stack(results)
-            img_loss = img2mse(rgb, target_s)
-            trans = extras['raw'][...,-1]
-            loss = img_loss
-            psnr = mse2psnr(img_loss)
-
-            if 'rgb0' in extras:
-                img_loss0 = img2mse(extras['rgb0'], target_s)
-                loss = loss + img_loss0
-                psnr0 = mse2psnr(img_loss0)
-
-            total_loss = total_loss + loss.item()
+            render_kwargs_test['network_fn'].image_plane = image_plane
+            render_kwargs_test['network_fine'].image_plane = image_plane
             
-            loss.backward()
-            optimizer.step()
-            
-        losses.append(total_loss)
-        # NOTE: IMPORTANT!
-        ###   update learning rate   ###
-        decay_rate = 0.1
-        decay_steps = args.lrate_decay * 1000
-        new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = new_lrate
-        ################################
+            for gt in range(10):
+                imageio.imsave(join(results_dir, f'ground_t_{gt}.png'), to8b(object['images'][gt].detach().cpu().numpy()))
 
-        dt = time.time()-time0
-        # print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
-        #####           end            #####
+                with torch.no_grad():
+                    img_i = [gt]
+                    target = object['images'][img_i][0].to(device)
+                    target = torch.Tensor(target.float())
+                    pose = object['cam_poses'][img_i, :3,:4][0].to(device)
 
-        # Rest is logging
-        if i%args.i_weights==0:
-            path = os.path.join(basedir, expname, '{:06d}.tar'.format(i))
-            torch.save({
-                'global_step': global_step,
-                'network_fn_state_dict': render_kwargs_train['network_fn'].state_dict(),
-                'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-            }, path)
-            print('Saved checkpoints at', path)
+                    img_r, _, _, _ = render(H, W, K, chunk=args.chunk, c2w = pose,
+                                                                verbose=True, retraw=True,
+                                                                **render_kwargs_test)
 
-        if i%5==0 or i==1:
-            for ti, batch in enumerate(dataloader_test):
-                if ti >= 5:
-                    break
-                for oi in range(batch['images'].size(0)):
-                    object = {'images': batch['images'][oi].float(), 'cam_poses': batch['cam_poses'][oi].float()}
-                    testsavedir = os.path.join(basedir, expname, f'testset_{i}', f'{ti}')
-                    os.makedirs(testsavedir, exist_ok=True)
-                    poses = object['cam_poses'][0:5] 
-                    with torch.no_grad():
-                        image_plane = ImagePlane(focal, object['cam_poses'].cpu().numpy(), object['images'].cpu().numpy(), 50)
-                        render_kwargs_test['network_fn'].image_plane = image_plane
-                        render_kwargs_test['network_fine'].image_plane = image_plane
-                        _, _, p = render_path(torch.Tensor(poses).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=object['images'][0:5], savedir=testsavedir) #images
-                        imageio.imwrite(os.path.join(testsavedir, f'gt.png'), to8b(object['images'][0].cpu().numpy()))
-                        
-        tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss}")
-        plt.plot(losses)
-        plt.savefig(os.path.join(basedir, expname, f'loss_plot.png'))
-        plt.close()
-        global_step += 1
+                    frame = torch.cat([img_r], dim=1)
+
+                    imageio.imsave(join(results_dir, f'rec_{gt}.png'), to8b(frame.detach().cpu().numpy()))
 
 
 if __name__=='__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    set_seed(111)
+
     train()

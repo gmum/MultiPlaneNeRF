@@ -1,4 +1,7 @@
-torch==1.11.0
+torch==2.0.0
+numpy
+torchmetrics
+pandas
 torchvision>=0.9.1
 imageio
 imageio-ffmpeg

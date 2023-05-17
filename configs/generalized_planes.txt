@@ -1,8 +1,8 @@
-expname = generalized_chairs_all
+expname = generalized_planes_all
 basedir = ./logs_4
-datadir = ./data/multiple/chairs
+datadir = ./data/multiple/planes
 dataset_type = many
-
+dataset_sample = planes
 no_batching = True
 
 use_viewdirs = True

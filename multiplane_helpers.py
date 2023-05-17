@@ -131,7 +131,6 @@ class ImagePlanes(torch.nn.Module):
         self.image_plane = torch.stack(self.images).to(device)
         
 
-
     def forward(self, points=None):
         if points.shape[0] == 1:
             points = points[0]

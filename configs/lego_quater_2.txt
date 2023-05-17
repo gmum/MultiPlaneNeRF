@@ -1,4 +1,4 @@
-expname = lego_c90
+expname = lego_s100
 basedir = ./logs_mini
 datadir = ./data/nerf_synthetic/lego
 dataset_type = blender
@@ -16,5 +16,5 @@ N_rand = 1024
 precrop_iters = 750
 precrop_frac = 0.5
 
-divide_fac = 1
-mi_count = 90
+divide_fac = 8
+mi_count = 100

@@ -2,6 +2,7 @@ expname = generalized_chairs_all
 basedir = ./logs_4
 datadir = ./data/multiple/chairs
 dataset_type = many
+dataset_sample = chairs
 
 no_batching = True
 

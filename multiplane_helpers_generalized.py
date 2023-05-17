@@ -8,6 +8,7 @@ class RenderNetwork(torch.nn.Module):
     ):
         super().__init__()
         self.input_size = 3*input_size + input_size*3 
+        
         self.layers_main = torch.nn.Sequential(
               torch.nn.Linear(self.input_size, 2048),
               torch.nn.ReLU(),
@@ -39,9 +40,6 @@ class RenderNetwork(torch.nn.Module):
         )
 
     def forward(self, triplane_code, viewdir):
-        #print(triplane_code.size)
-        #print(viewdir.size)
-        #x0 = torch.cat([triplane_code, viewdir], dim=-1)
         x = self.layers_main(triplane_code)
         x1 = torch.concat([x, triplane_code], dim=1)
         

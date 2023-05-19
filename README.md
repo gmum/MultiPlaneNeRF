@@ -6,6 +6,17 @@
   <img src="/images/lego_mi_final_spiral_500000_rgb.gif" alt="Image" width="200">
 </div>
 
+| arXiv |
+| :---- |
+| [MultiPlaneNeRF: Neural Radiance Field with Non-Trainable Representation](https://arxiv.org/pdf/2305.10579.pdf)|
+
+
+### Abstract
+*NeRF is a popular model that efficiently represents 3D objects from 2D images. However, vanilla NeRF has a few important limitations. NeRF must be trained on each object separately. The training time is long since we encode the object’s shape and color in neural network weights. Moreover, NeRF does not generalize well to unseen data. In this paper, we present MultiPlaneNeRF – a first model
+that simultaneously solves all the above problems. Our model works directly on 2D images. We project 3D points on 2D images to produce non-trainable representations. The projection step is not parametrized, and a very shallow decoder can efficiently process the representation. Using existing images as part of NeRF can significantly reduce the number of parameters since we train only a small implicit decoder. Furthermore, we can train MultiPlaneNeRF on a large data set and force our implicit decoder to generalize across many objects. Consequently, we can only replace the 2D images (without additional training) to produce a NeRF representation of the new object. In the experimental section, we demonstrate that MultiPlaneNeRF achieves comparable results to state-of-the-art models for synthesizing new views and has generalization properties.*
+
+ <img src="/images/image.png" alt="Image" width="400">
+
 Code based on NeRF pytorch implementation by yenchenlin: https://github.com/yenchenlin/nerf-pytorch, that implements the method of MultiPlaneNeRF paper.
 
 ## Requirements

@@ -138,7 +138,7 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
     return ret_list + [ret_dict]
 
 
-def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0, calculate_metrics=False):
     H, W, focal = hwf
 
     if render_factor!=0:
@@ -164,23 +164,23 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
             imageio.imwrite(filename, rgb8)
 
     rgbs = np.stack(rgbs, 0)
-    
-    print(type(gt_imgs))
-    ssim_f = StructuralSimilarityIndexMeasure().to('cpu')
-    img_ssim = ssim_f(torch.permute(torch.from_numpy(rgbs), (0, 3, 1, 2)), torch.permute(torch.from_numpy(gt_imgs), (0, 3, 1, 2)))
-
-    lpips_f = LearnedPerceptualImagePatchSimilarity(net_type='vgg').to('cpu')
-    img_lpips = lpips_f(torch.permute(torch.from_numpy(rgbs), (0, 3, 1, 2)), torch.permute(torch.from_numpy(gt_imgs), (0, 3, 1, 2)))
-    
-    rgbss = np.array(rgbs)
-    gts = np.array(gt_imgs)
-
-    p = -10. * np.log10(np.mean(np.square(rgbss - gts)))
-    print(" CALCULATED PSNR FOR TESTSET")
-    with open(os.path.join(savedir, 'result.txt'), 'w') as f:
-        f.write(f"psnr: {p}\nssim: {img_ssim}\nlpips: {img_lpips}")
-        
     disps = np.stack(disps, 0)
+
+    if calculate_metrics:
+        ssim_f = StructuralSimilarityIndexMeasure().to('cpu')
+        img_ssim = ssim_f(torch.permute(torch.from_numpy(rgbs), (0, 3, 1, 2)), torch.permute(torch.from_numpy(gt_imgs), (0, 3, 1, 2)))
+    
+        lpips_f = LearnedPerceptualImagePatchSimilarity(net_type='vgg').to('cpu')
+        img_lpips = lpips_f(torch.permute(torch.from_numpy(rgbs), (0, 3, 1, 2)), torch.permute(torch.from_numpy(gt_imgs), (0, 3, 1, 2)))
+        
+        rgbss = np.array(rgbs)
+        gts = np.array(gt_imgs)
+    
+        p = -10. * np.log10(np.mean(np.square(rgbss - gts)))
+        print(" CALCULATED PSNR FOR TESTSET")
+        with open(os.path.join(savedir, 'result.txt'), 'w') as f:
+            f.write(f"psnr: {p}\nssim: {img_ssim}\nlpips: {img_lpips}")
+
     return rgbs, disps
 
 
@@ -803,7 +803,7 @@ def train():
         rays_rgb = torch.Tensor(rays_rgb).to(device)
 
 
-    N_iters = 1000000 + 1
+    N_iters = 200000 + 1
     print('Begin')
     print('TRAIN views are', i_train)
     print('TEST views are', i_test)
@@ -921,7 +921,7 @@ def train():
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', poses[i_test].shape)
             with torch.no_grad():
-                render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+                render_path(torch.Tensor(poses[i_test]).to(device), hwf, K, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir, calculate_metrics=True)
             print('Saved test set')
 
     

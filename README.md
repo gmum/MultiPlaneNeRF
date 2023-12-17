@@ -19,6 +19,10 @@ that simultaneously solves all the above problems. Our model works directly on 2
 
 Code based on NeRF pytorch implementation by yenchenlin: https://github.com/yenchenlin/nerf-pytorch, that implements the method of MultiPlaneNeRF paper.
 
+## MultiPlaneGAN
+
+In this repo, we add an implementation of MultiPlaneGAN  https://github.com/gmum/MultiPlaneGan
+
 ## Requirements
 - Dependencies stored in `requirements.txt`.
 - Python 3.9.12
